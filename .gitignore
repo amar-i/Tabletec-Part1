@@ -1,0 +1,16 @@
+# Part 1 publication is intentionally an allowlist. Everything else stays local.
+/*
+!/.gitignore
+!/README.md
+!/deliverables/
+!/docs/
+/deliverables/*
+!/deliverables/SWEN383_P1_Tabletec.pdf
+/docs/*
+!/docs/part1-design.md
+!/docs/uml/
+/docs/uml/*
+!/docs/uml/README.md
+!/docs/uml/*.puml
+!/docs/uml/*.png
+!/docs/uml/*.svg

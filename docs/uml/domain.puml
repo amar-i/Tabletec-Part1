@@ -1,0 +1,93 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #000000
+skinparam TitleFontColor #000000
+skinparam TitleFontSize 16
+skinparam stereotypeFontColor #000000
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundcorner 0
+hide circle
+hide empty methods
+skinparam dpi 180
+skinparam ArrowColor #000000
+skinparam classBorderColor #000000
+skinparam classBackgroundColor #FFFFFF
+skinparam classHeaderBackgroundColor #FFFFFF
+skinparam classBorderThickness 1
+skinparam noteBackgroundColor #FFFFFF
+skinparam noteBorderColor #000000
+skinparam legendBackgroundColor #FFFFFF
+skinparam legendBorderColor #000000
+skinparam classAttributeIconSize 0
+
+class Restaurant <<configuration>> {
+  id: String
+  name: String
+  timeZone: String
+  slots: SeatingTime[3]
+}
+class DiningTable <<entity>> {
+  id: String
+  seats: Integer
+}
+class MenuItem <<entity>> {
+  id: String
+  name: String
+  englishName: String
+  containsPork: Boolean
+  priceCents: Integer
+  available: Boolean
+  limitPerSlot: Integer
+}
+class Reservation <<entity>> {
+  id: UUID
+  manageToken: UUID
+  date: LocalDate
+  slot: SeatingTime
+  partySize: Integer {1..6}
+  tableId: String
+  status: ReservationStatus
+  totalCents: Integer
+  createdAt: Instant
+}
+class GuestContact <<value object>> {
+  name: String
+  email: String
+}
+class PreorderLine <<value object>> {
+  itemId: String
+  name: String
+  englishName: String
+  containsPork: Boolean
+  unitPriceCents: Integer
+  quantity: Integer {1..12}
+}
+enum ReservationStatus <<enumeration>> {
+  confirmed
+  seated
+  completed
+  cancelled
+}
+
+Restaurant "1" *-- "5" DiningTable : tables
+Restaurant "1" *-- "1..*" MenuItem : menu
+Restaurant "1" o-- "0..*" Reservation : bookings
+Reservation "0..*" --> "1" DiningTable : allocated table
+Reservation "1" *-- "1" GuestContact : guest
+Reservation "1" *-- "0..*" PreorderLine : lines
+PreorderLine "0..*" --> "1" MenuItem : snapshot of
+Reservation --> ReservationStatus : status
+
+note bottom of PreorderLine
+  Name and price are copied
+  when the booking is made.
+end note
+note bottom of DiningTable
+  One booking per table,
+  date and seating.
+end note
+
+@enduml

@@ -1,0 +1,97 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #000000
+skinparam TitleFontColor #000000
+skinparam TitleFontSize 16
+skinparam stereotypeFontColor #000000
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundcorner 0
+hide circle
+hide empty members
+skinparam dpi 180
+skinparam ArrowColor #000000
+skinparam classBorderColor #000000
+skinparam classBackgroundColor #FFFFFF
+skinparam classHeaderBackgroundColor #FFFFFF
+skinparam classBorderThickness 1
+skinparam noteBackgroundColor #FFFFFF
+skinparam noteBorderColor #000000
+skinparam classAttributeIconSize 0
+
+class HttpAdapter <<boundary>> {
+  handle(request): Response
+}
+class BookingService <<GRASP Controller>> {
+  - store: JsonStore
+  - availability: AvailabilityService
+  - events: BookingEvents
+  {field} - now: () => Date
+  {field} - builderFactory: () => ReservationBuilder
+  + create(input): Reservation
+  + availabilityFor(date, partySize): Slot[]
+  + menuFor(date, slot): MenuItem[]
+  + get(id, token): Reservation
+  + cancel(id, token): Reservation
+  + transition(id, next): Reservation
+}
+class MenuService {
+  + setAvailability(itemId, available): MenuItem
+}
+class AvailabilityService <<Information Expert>> {
+  - strategy: TableSelectionStrategy
+  + select(state, date, slot, partySize): DiningTable?
+  + freeTables(state, date, slot): DiningTable[]
+  + remaining(state, item, date, slot): Integer
+}
+abstract class TableSelectionStrategy <<Strategy>> {
+  + {abstract} select(tables, partySize): DiningTable?
+}
+class SmallestSuitableTable <<ConcreteStrategy>> {
+  + select(tables, partySize): DiningTable?
+}
+class FirstSuitableTable <<ConcreteStrategy>> {
+  + select(tables, partySize): DiningTable?
+}
+class ReservationBuilder <<Builder>> {
+  - fields: Object
+  + forGuest(name, email): ReservationBuilder
+  + forVisit(date, slot, partySize, tableId): ReservationBuilder
+  + withPreorder(lines): ReservationBuilder
+  + build(now): Reservation
+}
+class Reservation <<Product>>
+class BookingEvents <<Subject>> {
+  - listeners: BookingListener[]
+  + subscribe(listener): void
+  + publish(event): void
+}
+interface BookingListener <<Observer>> {
+  + notify(event): void
+}
+class BookingLogListener {
+  + notify(event): void
+}
+class JsonStore <<Pure Fabrication>> {
+  - file: Path
+  + read(): State
+  + transaction(operation): Result
+  + write(state): void
+}
+
+HttpAdapter --> BookingService : delegates use cases
+HttpAdapter --> MenuService : staff menu updates
+BookingService --> AvailabilityService : uses
+BookingService --> JsonStore : transaction
+BookingService ..> ReservationBuilder : fresh builder per booking
+BookingService --> BookingEvents : publishes after save
+MenuService --> JsonStore
+AvailabilityService o--> "1" TableSelectionStrategy : delegates selection
+TableSelectionStrategy <|-- SmallestSuitableTable
+TableSelectionStrategy <|-- FirstSuitableTable
+ReservationBuilder ..> Reservation : <<create>>
+BookingEvents o--> "0..*" BookingListener : notifies
+BookingListener <|.. BookingLogListener
+@enduml

@@ -1,0 +1,83 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #000000
+skinparam TitleFontColor #000000
+skinparam TitleFontSize 16
+skinparam stereotypeFontColor #000000
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundcorner 0
+skinparam dpi 180
+skinparam ArrowColor #000000
+skinparam noteBackgroundColor #FFFFFF
+skinparam noteBorderColor #000000
+skinparam sequenceParticipantBackgroundColor #FFFFFF
+skinparam sequenceParticipantBorderColor #000000
+skinparam sequenceLifeLineBorderColor #555555
+skinparam sequenceGroupBorderColor #000000
+skinparam sequenceBoxBorderColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam DatabaseBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #000000
+skinparam BoundaryBackgroundColor #FFFFFF
+skinparam BoundaryBorderColor #000000
+skinparam ControlBackgroundColor #FFFFFF
+skinparam ControlBorderColor #000000
+skinparam sequenceMessageAlign left
+actor Guest
+boundary "Browser" as UI
+boundary "HttpAdapter" as HTTP
+control "BookingService" as Service
+database "JsonStore" as Store
+participant "AvailabilityService" as Availability
+participant "ReservationBuilder" as Builder
+participant "BookingEvents" as Events
+
+Guest -> UI : choose date, seating, party, meals, contact
+activate UI
+UI -> HTTP : POST /api/bookings
+activate HTTP
+HTTP -> Service : create(input)
+activate Service
+Service -> Store : transaction(callback)
+activate Store
+Store -> Service : callback(draft state)
+Service -> Service : validateVisit(date, slot, partySize, now)
+Service -> Availability : select(state, date, slot, partySize)
+activate Availability
+Availability -> Availability : strategy.select(freeTables, partySize)
+Availability --> Service : table or null
+deactivate Availability
+Service -> Service : check cutoff, catalog, quantities, portions
+alt no table, invalid input or insufficient portions
+  Service --> Store : throw DomainError
+  Store --> Service : draft discarded, nothing written
+  Service --> HTTP : DomainError(status)
+  HTTP --> UI : 400 validation / 409 conflict
+  UI --> Guest : show error, refresh availability
+else all checks pass
+  Service -> Builder ** : builderFactory()
+  Service -> Builder : forGuest(name, email)\n.forVisit(date, slot, partySize, tableId)\n.withPreorder(lines)
+  Service -> Builder : build(now)
+  activate Builder
+  Builder --> Service : Reservation (price snapshots, total)
+  deactivate Builder
+  Service -> Service : state.bookings.push(reservation)
+  Service --> Store : return reservation
+  Store -> Store : write temp file, atomic rename
+  Store --> Service : saved reservation
+  deactivate Store
+  Service -> Events : publish(booking.created)
+  activate Events
+  note right of Events : Runs after saving.\nCannot undo the booking.
+  deactivate Events
+  Service --> HTTP : reservation + private manage key
+  deactivate Service
+  HTTP --> UI : 201 Created
+  deactivate HTTP
+  UI --> Guest : reference, key, meal estimate
+  deactivate UI
+end
+@enduml
